@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block scripts %}
+  {{ super() | safe }}
+
+	<script type="text/javascript">
+		$.ajax({
+	    async:false,
+	    url: '/src/{{ fname }}',
+	    dataType: 'text',
+	    success: function(data) {
+	      console.log(data);
+	 	    $('#src_code').append(data);
+	    }
+	  });
+	</script>
+{% endblock %}
+
+{% block body_contents %}
+<h1>{{ fname }}</h1>
+
+<pre style="background-color: white">
+	{% if is_image %}
+		<img src="/img/{{ fname }}"></code>
+	{% else %}
+		<code class="lineNumbers {{ source_highlight_class }}" id="src_code"></code>
+	{% endif %}
+</pre>
+
+{% endblock %}

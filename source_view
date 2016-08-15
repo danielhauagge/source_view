@@ -1,0 +1,277 @@
+#!/usr/bin/env python
+
+#
+# Simple web server to show the code that the instructor is working on.
+#
+
+import cgi
+import logging
+import argparse
+import os
+from math import ceil
+from os import path
+import os
+import sys
+from urllib import quote
+from commands import getstatusoutput
+from datetime import datetime
+from flask import (Flask, jsonify, make_response, request, abort, send_file,
+                  render_template, send_from_directory, redirect, Response)
+from flask_bootstrap import Bootstrap
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+import socket
+import thread
+import numpy as np
+import json
+import urllib2
+import re
+from fnmatch import fnmatch
+from glob import glob
+
+
+from random import randint, shuffle
+import struct, imghdr, re #, magic
+# from PIL import Image
+from StringIO import StringIO
+
+
+# ============================================================================ #
+# Globals                                                                      #
+# ============================================================================ #
+
+SOURCE_PATTERN   = ['*.swift', '*.m', '*.h', '*.H', '*.plist', '*.json', '*.py', '*Podfile', '*Podfile.lock']
+DOWNLOAD_PATTERN = ['*.storyboard', '*.pbxproj', '*.zip']
+IMAGE_PATTERN    = ['*.png', '*.jpg', '*.jpeg']
+IGNORE_PATTERN   = ['.DS_Store', 'xcuserdata']
+SOURCE_2_HIGHLIGHT_CLASS = {
+        '*.swift': 'swift', 
+        '*Podfile': 'ruby', 
+        '*.plist': 'xml',
+        '*.py': 'python'
+    }
+
+# App
+app_dir                  = path.split(__file__)[0]
+app                      = Flask(__name__,
+                                 template_folder=path.join(app_dir, 'templates'),
+                                 static_folder=path.join(app_dir, 'static'))
+
+base_path                = None
+Bootstrap(app)
+
+
+# ============================================================================ #
+# Utils                                                                        #
+# ============================================================================ #
+
+
+def get_source_highlight_class(fname):
+    for pattern in SOURCE_2_HIGHLIGHT_CLASS:
+        if fnmatch(fname, pattern):
+            return SOURCE_2_HIGHLIGHT_CLASS[pattern]
+    return ''
+
+
+def is_source_file(fname):
+    for pattern in SOURCE_PATTERN:
+        if fnmatch(fname, pattern):
+            return True
+    return False
+
+
+def is_download(fname):
+    for pattern in DOWNLOAD_PATTERN:
+        if fnmatch(fname, pattern):
+            return True
+    return False
+
+
+def is_ignore(fname):
+    fname = path.basename(path.abspath(fname))
+
+    if fname.startswith('.'): return True
+
+    for pattern in IGNORE_PATTERN:
+        if fnmatch(fname, pattern):
+            return True
+    return False
+
+
+def is_image(fname):
+    for pattern in IMAGE_PATTERN:
+        if fnmatch(fname, pattern):
+            return True
+    return False
+
+
+def get_directory_tree(path_):
+    global base_path
+
+    path_r = path.realpath(path_)
+    path_rel = path_r.replace(path.realpath(base_path), '')
+
+
+    if is_ignore(path_):
+        return []
+
+    d = {'text': path.basename(path_)}
+    # print '-->', path.basename(path_)
+
+    if is_source_file(path_) or is_image(path_):
+        d['href'] = '/inspect' + path_rel
+        d['icon'] = 'glyphicon glyphicon-file'
+    elif is_download(path_):
+        d['href'] = '/download' + path_rel
+        d['icon'] = 'glyphicon glyphicon-save-file'
+
+
+    if path.isdir(path_):
+        # d['icon'] = 'glyphicon glyphicon-folder-close'
+        d['nodes'] = [get_directory_tree(path.join(path_, x)) for x in os.listdir(path_) if not is_ignore(x)]
+
+    # if path.basename(path_) in ['', '.']:
+    #     d = d['nodes']
+
+    return d
+
+
+def get_machine_ip():
+	return socket.gethostbyname(socket.gethostname())
+
+
+# ============================================================================ #
+# API Calls                                                                    #
+# ============================================================================ #
+
+
+@app.errorhandler(404)
+def page_not_found(error):
+    return render_template('base.html', error_message="Resource not found"), 404
+
+
+@app.route('/js/<fname>')
+def send_js(fname):
+    return send_from_directory(path.join(app_dir, 'static/js'), fname)
+
+
+@app.route('/css/<fname>')
+def send_css(fname):
+    return send_from_directory(path.join(app_dir, 'static/css'), fname)
+
+
+@app.route('/fonts/<fname>')
+def send_fonts(fname):
+    return send_from_directory(path.join(app_dir, 'static/fonts'), fname)
+
+
+@app.route('/img/<path:fname>')
+def get_image(fname):
+    global base_path
+
+    full_fname = path.abspath(path.join(base_path, fname))
+
+    return send_file(full_fname, mimetype='image')
+
+
+@app.route('/src/<path:fname>')
+def view_file_contents(fname):
+    global base_path
+
+    full_fname = path.join(base_path, fname)
+
+    src = open(full_fname).read()
+    src = cgi.escape(src)
+    return Response(src, mimetype = 'text/plain')
+
+
+@app.route('/inspect/<path:fname>')
+def view_file(fname):
+
+    other_opts = {}
+    if is_source_file(fname):
+        other_opts['source_highlight_class'] = get_source_highlight_class(fname)
+
+    return render_template('inspect.html', fname = fname, 
+        is_image = is_image(fname), **other_opts )
+
+
+@app.route('/download/<path:fname>')
+def download_file(fname):
+    global base_path
+
+    if not is_download(fname):
+        return abort(404)
+
+    full_fname = path.abspath(path.join(base_path, fname))
+
+    return send_file(full_fname)
+
+
+@app.route('/')
+def view_file_list():
+    global base_path
+
+    file_tree = json.dumps([get_directory_tree(base_path)])
+
+    return render_template('list_files.html', file_tree = file_tree)
+
+
+# ============================================================================ #
+# Logging                                                                      #
+# ============================================================================ #
+
+
+def init_logger():
+    '''Initialize the logger, call at the begining of main.
+    '''
+    logging.root.setLevel(logging.DEBUG)
+
+    logging.basicConfig(level=logging.DEBUG,
+                        format= '[SourceView] %(asctime)s %(levelname)5s: %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+
+    logging.addLevelName(logging.WARNING, 'WARN')
+
+
+# ============================================================================ #
+# Main                                                                         #
+# ============================================================================ #
+
+
+if __name__ == '__main__':
+    init_logger()
+
+
+    # for x in directory_walk('.'):
+        # print x
+    # open('/tmp/bla.json', 'w').write(path_to_dict('.'))
+    # d = path_to_dict('.')
+    # print json.dumps(d)
+    # open('/tmp/bla.json', 'w').write(json.dumps(d))
+    # sys.exit(1)
+
+    # Command line options
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "path", metavar='F', type=str,
+        help="Base source directory."
+    )
+    parser.add_argument(
+        "--debug", default=False, action='store_true',
+        help="Run in debug mode."
+    )
+
+    args = vars(parser.parse_args())
+    base_path = args['path']
+
+    port = 8000
+
+    logging.info('=' * 80)
+    logging.info('http://%s:%d', get_machine_ip(), port)
+    logging.info('=' * 80)
+
+    app.run(port = port, host = '0.0.0.0', debug = args['debug'], threaded = not args['debug'])

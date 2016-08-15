@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block scripts %}
+  {{ super() | safe }}
+
+  <script type="text/javascript">
+  	function getTree() {
+			var tree = {{ file_tree | safe }};
+  		return tree;
+		}
+
+	$('#tree').treeview({
+		data: getTree(),
+		showBorder: false,
+		enableLinks: true,
+		expandIcon: 'glyphicon glyphicon-folder-close',
+		collapseIcon: 'glyphicon glyphicon-folder-open'
+	});
+
+  </script>
+
+{% endblock %}
+
+{% block body_contents %}
+<div id="tree"></div>
+{% endblock %}

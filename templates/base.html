@@ -1,0 +1,84 @@
+{% extends "bootstrap/base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+{% import "bootstrap/fixes.html" as fixes %}
+{% import "bootstrap/utils.html" as util %}
+
+{# References:                                                                #}
+{# https://pythonhosted.org/Flask-Bootstrap/basic-usage.html                  #}
+
+{# ========================================================================== #}
+{# Head                                                                       #}
+{# ========================================================================== #}
+{% block head %}
+  {{ super() | safe }}
+  {{ fixes.ie8() }}
+  {% block extra_css %}{% endblock %}
+{% endblock %}
+
+{% block title %}Source View{% endblock %}
+
+{% block styles %}
+  {{ super() | safe }}
+  <!-- Custom styles for this template -->
+
+  {# Fonts #}
+  <link href='http://fonts.googleapis.com/css?family=Lato:300,400,700|Allerta' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  {# Tree view #}
+  <link rel="stylesheet" href="/css/bootstrap-treeview.min.css">
+
+  {# Source highlighting #}
+  {# <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/default.min.css"> #}
+  <link rel="stylesheet" href="/css/default.css">
+  <link rel="stylesheet" href="/css/xcode.css">
+
+  {# Project #}
+  <link href="/css/source_view.css" rel="stylesheet">
+  
+{% endblock %}
+
+{% block scripts %}
+  {{ super() | safe }}
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+  
+  {# Tree view #}
+  <script src="/static/js/bootstrap-treeview.min.js"></script>
+
+  {# Source highlighting #}
+  <script src="/static/js/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+{% endblock %}
+
+{# ========================================================================== #}
+{# Navbar                                                                     #}
+{# ========================================================================== #}
+{% block navbar %}
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Source View</a>
+      </div>
+    </div>
+  </nav>
+{% endblock %}
+
+{# ========================================================================== #}
+{# Content                                                                    #}
+{# ========================================================================== #}
+{% block content %}
+  <div class="container">
+    <div class="starter-template">
+      {{ util.flashed_messages(dismissible=True) }}
+      {% block body_contents %}{% endblock %}
+    </div>
+  </div>
+{% endblock %}
+
